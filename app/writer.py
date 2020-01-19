@@ -113,7 +113,16 @@ def _build_header(brightness: Brightness, slot_list: List[Slot]) -> bytes:
     mode_list = [m.get_mode() for m in slot_list]
     # 7-0 -> mode 8-1: laser(on motion=0)/freeze(on motion!=0)
     laser = sum([int(x.motion == Motion.LASER) << i for i, x in enumerate(slot_list)])
+    columns_list = [x.columns for x in slot_list]
     column_offset_list = [0] + list(itertools.accumulate([x.columns for x in slot_list]))
+    if max(columns_list) > 0xffff:
+        raise RuntimeError(
+            "Columns must be less than 65536: {}".format(columns_list)
+        )
+    if max(column_offset_list) > 0xffff:
+        raise RuntimeError(
+            "Column offset must be less than 65536: {}".format(column_offset_list)
+        )
 
     return bytes([
         *MAGIC_NUMBER,
@@ -122,7 +131,8 @@ def _build_header(brightness: Brightness, slot_list: List[Slot]) -> bytes:
         *mode_list,
         0x00,
         *itertools.chain.from_iterable([
-            [0x00, column_offset_list[x], 0x00, slot_list[x].columns]
+            [(column_offset_list[x] >> 8) & 0xff, column_offset_list[x] & 0xff,
+             (columns_list[x] >> 8) & 0xff, columns_list[x] & 0xff]
             for x in range(SLOT_MAX)
         ]),
         laser,
