@@ -8,9 +8,9 @@ This script can write to LED name badge which ...
 * shows "M1-8" at startup.
 * can be written by "LED Display" and "Mini LED Display".
 
-LED Display: ![LED Display](https://raw.githubusercontent.com/amane-katagiri/m1-8-writer/static/led-display.png)
+LED Display: ![LED Display](https://raw.githubusercontent.com/amane-katagiri/m1-8-writer/master/static/led-display.png)
 
-Mini LED Display: ![Mini LED Display](https://raw.githubusercontent.com/amane-katagiri/m1-8-writer/static/mini-led-display.png)
+Mini LED Display: ![Mini LED Display](https://raw.githubusercontent.com/amane-katagiri/m1-8-writer/master/static/mini-led-display.png)
 
 ## Data Structure
 
