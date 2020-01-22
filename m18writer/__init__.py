@@ -1,4 +1,5 @@
 """Meta infomation of m1-8-writer."""
+from pkg_resources import get_distribution
 
 __author__ = "Amane Katagiri"
 __contact__ = "amane@ama.ne.jp"
@@ -6,4 +7,4 @@ __copyright__ = "Copyright (C) 2020 Amane Katagiri"
 __credits__ = ["Amane Katagiri"]
 __date__ = "2020-01-19"
 __license__ = "MIT"
-__version__ = "0.2.0"
+__version__ = get_distribution("m18writer").version
