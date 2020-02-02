@@ -6,4 +6,4 @@ __copyright__ = "Copyright (C) 2020 Amane Katagiri"
 __credits__ = ["Amane Katagiri"]
 __date__ = "2020-01-19"
 __license__ = "MIT"
-__version__ = "0.7.2"
+__version__ = "0.8.0"

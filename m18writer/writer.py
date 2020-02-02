@@ -33,14 +33,6 @@ class Brightness(IntEnum):
     DIMMEST = 3
 
 
-BRIGHTNESS_LIST = {
-    "1": Brightness.DIMMEST,
-    "2": Brightness.DIMMER,
-    "3": Brightness.BRIGHTER,
-    "4": Brightness.BRIGHTEST
-}
-
-
 class Speed(IntEnum):
     SPEED_0 = 0
     SPEED_1 = 1
@@ -50,18 +42,6 @@ class Speed(IntEnum):
     SPEED_5 = 5
     SPEED_6 = 6
     SPEED_7 = 7
-
-
-SPEED_LIST = {
-    "1": Speed.SPEED_0,
-    "2": Speed.SPEED_1,
-    "3": Speed.SPEED_2,
-    "4": Speed.SPEED_3,
-    "5": Speed.SPEED_4,
-    "6": Speed.SPEED_5,
-    "7": Speed.SPEED_6,
-    "8": Speed.SPEED_7,
-}
 
 
 class Motion(IntEnum):
@@ -74,19 +54,6 @@ class Motion(IntEnum):
     SNOW = 0b110
     CURTAIN = 0b111
     LASER = 0b1000
-
-
-MOTION_LIST = {
-    "left": Motion.LEFT,
-    "right": Motion.RIGHT,
-    "up": Motion.UP,
-    "down": Motion.DOWN,
-    "freeze": Motion.FREEZE,
-    "animation": Motion.ANIMATION,
-    "snow": Motion.SNOW,
-    "curtain": Motion.CURTAIN,
-    "laser": Motion.LASER
-}
 
 
 @dataclass
@@ -140,6 +107,13 @@ def _build_header(brightness: Brightness, slot_list: List[Slot]) -> bytes:
     ])
 
 
+def _build_body(slot_list: List[Slot]) -> bytes:
+    return bytes(itertools.chain.from_iterable([
+        itertools.chain.from_iterable(x)
+        for x in zip(*[zip(*[iter(x.bitmap)] * x.columns) for x in slot_list])
+    ]))
+
+
 def load_image(path: str, lines: int, threshold: int, **mode) -> Slot:
     image = Image.open(path).convert("L")
     image = image.resize((int(image.width * (lines / image.height)), lines), Image.BICUBIC)
@@ -155,20 +129,42 @@ def load_image(path: str, lines: int, threshold: int, **mode) -> Slot:
     return Slot(bitmap=bitmap, columns=columns, **mode)
 
 
-def _build_body(slot_list: List[Slot]) -> bytes:
-    return bytes(itertools.chain.from_iterable([
-        itertools.chain.from_iterable(x)
-        for x in zip(*[zip(*[iter(x.bitmap)] * x.columns) for x in slot_list])
-    ]))
-
-
-def build_payload(brightness: Brightness, slot_list: List[Slot]):
+def write_payload(brightness: Brightness, slot_list: List[Slot], device="/dev/ttyUSB0", baud=1200):
     header = _build_header(brightness, slot_list)
     body = _build_body(slot_list)
-    return header + body[:16] + bytes([0 for x in range(32)]) + body[16:]
+    payload = header + body[:16] + bytes([0 for x in range(32)]) + body[16:]
+    m18 = serial.Serial(device, baud)
+    m18.write(payload)
 
 
 def main():
+    brightness_list = {
+        "1": Brightness.DIMMEST,
+        "2": Brightness.DIMMER,
+        "3": Brightness.BRIGHTER,
+        "4": Brightness.BRIGHTEST
+    }
+    speed_list = {
+        "1": Speed.SPEED_0,
+        "2": Speed.SPEED_1,
+        "3": Speed.SPEED_2,
+        "4": Speed.SPEED_3,
+        "5": Speed.SPEED_4,
+        "6": Speed.SPEED_5,
+        "7": Speed.SPEED_6,
+        "8": Speed.SPEED_7,
+    }
+    motion_list = {
+        "left": Motion.LEFT,
+        "right": Motion.RIGHT,
+        "up": Motion.UP,
+        "down": Motion.DOWN,
+        "freeze": Motion.FREEZE,
+        "animation": Motion.ANIMATION,
+        "snow": Motion.SNOW,
+        "curtain": Motion.CURTAIN,
+        "laser": Motion.LASER
+    }
     parser = argparse.ArgumentParser(description="USB writer for M1-8 matrix LED name badge.")
     parser.add_argument("paths", metavar="path", type=str, nargs="+",
                         help=f"an image path for bitmap (able to write to slot 1-{SLOT_MAX}).")
@@ -180,7 +176,7 @@ def main():
                         help="number of lines of LED name badge.")
     parser.add_argument("-t", "--threshold", type=int, default=128,
                         help="threshold of bitmap pixel to light LED.")
-    parser.add_argument("--brightness", default="4", choices=BRIGHTNESS_LIST,
+    parser.add_argument("--brightness", default="4", choices=brightness_list,
                         help="brightness of LED name badge.")
     for x in range(SLOT_MAX):
         parser.add_argument(f"--border{x + 1}", action="store_true",
@@ -189,10 +185,10 @@ def main():
         parser.add_argument(f"--blink{x + 1}", action="store_true",
                             help=f"blink bitmap on slot 1-{SLOT_MAX}."
                                  if x == 0 else argparse.SUPPRESS)
-        parser.add_argument(f"--speed{x + 1}", choices=SPEED_LIST,
+        parser.add_argument(f"--speed{x + 1}", choices=speed_list,
                             help=f"set speed on slot 1-{SLOT_MAX}."
                                  if x == 0 else argparse.SUPPRESS)
-        parser.add_argument(f"--motion{x + 1}", choices=MOTION_LIST,
+        parser.add_argument(f"--motion{x + 1}", choices=motion_list,
                             help=f"set motion on slot 1-{SLOT_MAX}."
                                  if x == 0 else argparse.SUPPRESS)
 
@@ -203,15 +199,13 @@ def main():
             **{k: v for k, v in{
                 "border": getattr(args, f"border{i + 1}"),
                 "blink": getattr(args, f"blink{i + 1}"),
-                "speed": SPEED_LIST.get(getattr(args, f"speed{i + 1}")),
-                "motion": MOTION_LIST.get(getattr(args, f"motion{i + 1}"))
+                "speed": speed_list.get(getattr(args, f"speed{i + 1}")),
+                "motion": motion_list.get(getattr(args, f"motion{i + 1}"))
             }.items() if v is not None}
         )
         for i, x in enumerate(args.paths[:SLOT_MAX])
     ]
-    payload = build_payload(BRIGHTNESS_LIST[args.brightness], slot_list)
-    m18 = serial.Serial(args.device, args.baud)
-    m18.write(payload)
+    write_payload(brightness_list[args.brightness], slot_list)
 
 
 if __name__ == "__main__":
