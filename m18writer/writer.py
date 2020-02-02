@@ -8,8 +8,10 @@ import itertools
 import logging
 from logging import getLogger, StreamHandler
 import math
+from pathlib import Path
 from typing import List
 
+import numpy as np
 from PIL import Image
 import serial
 
@@ -24,6 +26,7 @@ SLOT_MAX = 8
 COLUMNS_MAX = 255
 PIXEL_PER_COLUMN = 8
 MAGIC_NUMBER = [0x41, 0x68, 0x65, 0x6c, 0x6c, 0x6f]
+PREVIEW_PIXEL_GAP = (14, 14)
 
 
 class Brightness(IntEnum):
@@ -129,6 +132,25 @@ def load_image(path: str, lines: int, threshold: int, **mode) -> Slot:
     return Slot(bitmap=bitmap, columns=columns, **mode)
 
 
+def save_preview(path: str, lines: int, display_width: int, save_path: str):
+    image = Image.open(path).convert("L")
+    image = image.resize((int(image.width * (lines / image.height)), lines), Image.BICUBIC)
+
+    mask = np.array(Image.open(Path(__file__).parent / "mask.png"))
+    display_size = (PREVIEW_PIXEL_GAP[1] * lines, PREVIEW_PIXEL_GAP[0] * display_width)
+    for x in range(image.width // display_width + (1 if image.width % display_width else 0)):
+        im = image.crop((x * display_width, 0, (x + 1) * display_width, lines))
+        preview = np.zeros(display_size, dtype=np.uint8)
+        for i, p in enumerate(im.tobytes()):
+            submask = np.zeros(preview.shape, dtype=preview.dtype)
+            offset_x = (i % display_width) * PREVIEW_PIXEL_GAP[0]
+            offset_y = (i // display_width) * PREVIEW_PIXEL_GAP[1]
+            submask[offset_y:(offset_y + mask.shape[0]),
+                    offset_x:(offset_x + mask.shape[1])] = mask
+            preview[submask != 0] = p
+        Image.fromarray(preview).save(save_path.format(n=x))
+
+
 def write_payload(brightness: Brightness, slot_list: List[Slot], device="/dev/ttyUSB0", baud=1200):
     header = _build_header(brightness, slot_list)
     body = _build_body(slot_list)
@@ -174,10 +196,14 @@ def main():
                         help="baud rate of LED name badge.")
     parser.add_argument("-l", "--lines", type=int, default=12,
                         help="number of lines of LED name badge.")
+    parser.add_argument("-w", "--width", type=int, default=48,
+                        help="number of columns of LED name badge.")
     parser.add_argument("-t", "--threshold", type=int, default=128,
                         help="threshold of bitmap pixel to light LED.")
     parser.add_argument("--brightness", default="4", choices=brightness_list,
                         help="brightness of LED name badge.")
+    parser.add_argument("-p", "--preview", action="store_true",
+                        help="save preview of images (skip writing payload).")
     for x in range(SLOT_MAX):
         parser.add_argument(f"--border{x + 1}", action="store_true",
                             help=f"show border on slot 1-{SLOT_MAX}."
@@ -191,21 +217,28 @@ def main():
         parser.add_argument(f"--motion{x + 1}", choices=motion_list,
                             help=f"set motion on slot 1-{SLOT_MAX}."
                                  if x == 0 else argparse.SUPPRESS)
+        parser.add_argument(f"--savepath{x + 1}", type=str, default=f"preview_{x + 1}_{{n}}.png",
+                            help=f"path to save preview of image 1-{SLOT_MAX}."
+                                 if x == 0 else argparse.SUPPRESS)
 
     args = parser.parse_args()
-    slot_list = [
-        load_image(
-            x, args.lines, args.threshold,
-            **{k: v for k, v in{
-                "border": getattr(args, f"border{i + 1}"),
-                "blink": getattr(args, f"blink{i + 1}"),
-                "speed": speed_list.get(getattr(args, f"speed{i + 1}")),
-                "motion": motion_list.get(getattr(args, f"motion{i + 1}"))
-            }.items() if v is not None}
-        )
-        for i, x in enumerate(args.paths[:SLOT_MAX])
-    ]
-    write_payload(brightness_list[args.brightness], slot_list)
+    if not args.preview:
+        slot_list = [
+            load_image(
+                x, args.lines, args.threshold,
+                **{k: v for k, v in{
+                    "border": getattr(args, f"border{i + 1}"),
+                    "blink": getattr(args, f"blink{i + 1}"),
+                    "speed": speed_list.get(getattr(args, f"speed{i + 1}")),
+                    "motion": motion_list.get(getattr(args, f"motion{i + 1}"))
+                }.items() if v is not None}
+            )
+            for i, x in enumerate(args.paths[:SLOT_MAX])
+        ]
+        write_payload(brightness_list[args.brightness], slot_list)
+    else:
+        for i, p in enumerate(args.paths):
+            save_preview(p, args.lines, args.width, getattr(args, f"savepath{i + 1}"))
 
 
 if __name__ == "__main__":
