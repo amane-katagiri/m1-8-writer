@@ -64,7 +64,7 @@ Bitmap data are splitted line by line from the top and each line is splitted eve
 [
     0b10101010, packet_002, packet_003, packet_004,  # line 1
     packet_005, packet_006, packet_007, packet_008,  # line 2
-    packet_009, packet_010, packet_011, packet_012,  # line 2
+    packet_009, packet_010, packet_011, packet_012,  # line 3
     #         ... line by line ...
     0b10001000, 0b11001100, 0b11110000, 0b10110111
 ]
@@ -74,7 +74,7 @@ The first packet of data `0b10101010` represents `* * * * ` in top left corner a
 
 Each bitmap data is written in parallel line by line from the top.
 
-`bitmap_003_line_002` represents the 2nd line data of the 3rd bitmap.
+`bitmap_03_line_02` represents the 2nd line data of the 3rd bitmap.
 
 ```python
 # 4 bitmaps
