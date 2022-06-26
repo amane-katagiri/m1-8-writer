@@ -97,11 +97,6 @@ Each bitmap data is written in parallel line by line from the top.
     * Speed: 1, 2, 3, 4, 5, 6, 7, 8
     * Option: show border, blink
 
-## Requirement
-
-* [pyserial](https://pypi.org/project/pyserial/) 3.4
-* [Pillow](https://pypi.org/project/Pillow/) 7.0.0
-
 ## Usage
 
 Write 1 bitmap to slot 1:
